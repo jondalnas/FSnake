@@ -26,8 +26,8 @@ module KeyBoard =
         else false
 
 module Console =
-    (* Moves the cursor to the specified location and prints player character *)
-    let PlayerCharAtLocation (x, y) =
+    (* Moves the cursor to the specified location and prints fruit character *)
+    let FruitAtLocation (x, y) =
         ConsoleInterface.MoveCursor (x, y)
         ConsoleInterface.WriteScreen '@'
 
@@ -42,6 +42,10 @@ module Console =
             | (x, y, w, h) -> ConsoleInterface.WriteScreen(' '); Border (x-1, y, w, h)
         Border(w-1, h-1, w-1, h-1)
 
+    let rec DrawSnake = function
+        | [] -> ()
+        | first::tail -> ConsoleInterface.MoveCursor first; ConsoleInterface.WriteScreen '*'; DrawSnake tail
+
 module Input =
     (* Returns if the program should exit or not *)
     let ShouldExit () =
@@ -49,7 +53,9 @@ module Input =
 
 module Game =
     let rec MainLoop() =
-        Console.PlayerCharAtLocation (1,1)
+        Console.FruitAtLocation (1,1)
+        let snake = [(5,5); (5,6); (6,6); (6,7); (6,8); (7,8); (8,8); (8,7); (7,7)]
+        Console.DrawSnake snake
         let exit = Input.ShouldExit()
         if not exit then MainLoop()
 
