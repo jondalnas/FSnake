@@ -5,6 +5,11 @@ module ListTools =
         | [] -> []
         | front::tail -> elm::ReplaceFront front tail
 
+    let rec Contains elm = function
+        | head::_ when head=elm -> true
+        | _::tail -> Contains elm tail
+        |_ -> false
+
 module ConsoleInterface =
     (* Writes a character to the screen *)
     let WriteScreen (x: char) =
@@ -18,17 +23,15 @@ module ConsoleInterface =
     let ClearScreen =
         Console.Clear()
 
-module KeyBoard =
-    (* Returns the key which is currently being pressed *)
-    let ReadKey () =
-        if Console.KeyAvailable then Console.ReadKey().Key
-        else ConsoleKey.Sleep
+module Keyboard =
+    (* Read all keys pressed since last frame *)
+    let rec ReadKeyboard () =
+        if Console.KeyAvailable then Console.ReadKey(false).Key::ReadKeyboard()
+        else []
 
     (* Checks if a certain key is down *)
-    let GetKeyDown (x: ConsoleKey) =
-        let key = ReadKey()
-        if key = x then true
-        else false
+    let GetKeyDown (keyboardList, key:ConsoleKey) =
+        ListTools.Contains key keyboardList
 
 module Console =
     (* Moves the cursor to the specified location and prints fruit character *)
@@ -59,19 +62,22 @@ module Console =
 
 module Input =
     (* Returns if the program should exit or not *)
-    let ShouldExit () =
-        KeyBoard.GetKeyDown (ConsoleKey.Q)
+    let ShouldExit (keyboardList) =
+        Keyboard.GetKeyDown (keyboardList, ConsoleKey.Q)
 
     (* Returns which direction player should move *)
-    let Direction () =
-        if KeyBoard.GetKeyDown (ConsoleKey.RightArrow) then 0
-        elif KeyBoard.GetKeyDown (ConsoleKey.DownArrow) then 1
-        elif KeyBoard.GetKeyDown (ConsoleKey.LeftArrow) then 2
-        elif KeyBoard.GetKeyDown (ConsoleKey.UpArrow) then 3
+    let Direction (keyboardList) =
+        if Keyboard.GetKeyDown (keyboardList, ConsoleKey.RightArrow) then 0
+        elif Keyboard.GetKeyDown (keyboardList, ConsoleKey.DownArrow) then 1
+        elif Keyboard.GetKeyDown (keyboardList, ConsoleKey.LeftArrow) then 2
+        elif Keyboard.GetKeyDown (keyboardList, ConsoleKey.UpArrow) then 3
         else -1
 
 module Game =
     let rec MainLoop(snake: (int*int) list, dir) =
+        (* Read keyboard *)
+        let keyboardList = Keyboard.ReadKeyboard()
+
         (* Snake game logic *)
         (* Move snake *)
         let snakeFront = snake[0]
@@ -90,13 +96,13 @@ module Game =
         Console.DrawSnake newSnake
 
         (* Sleep before next update *)
-        Threading.Thread.Sleep(1000)
+        Threading.Thread.Sleep(250)
 
         (* If exit button is not pressed, then call MainLoop *)
-        let exit = Input.ShouldExit()
+        let exit = Input.ShouldExit(keyboardList)
         if not exit then 
             (* Update snake direction *)
-            let sd = Input.Direction()
+            let sd = Input.Direction(keyboardList)
             if sd = -1 then
                 MainLoop(newSnake, dir)
             else
