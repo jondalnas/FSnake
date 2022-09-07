@@ -97,30 +97,47 @@ module Input =
         else -1
 
 module Game =
-    let rec MainLoop(snake: (int*int) list, dir) =
+    let rec NewFruit (snake, rand: Random) =
+        let fruit = (rand.Next() % 11 + 1, rand.Next() % 11 + 1)
+        if Collision.PlayerColPoint (fruit, snake) then NewFruit (snake, rand)
+        else fruit
+
+    let rec MainLoop (snake: (int*int) list, dir, fruit, rand: Random) =
         (* Read keyboard *)
         let keyboardList = Keyboard.ReadKeyboard()
 
-        (* Snake game logic *)
-        (* Move snake *)
+        (* Find new snake head *)
         let snakeFront = snake[0]
         let (sfx, sfy) = snakeFront
-        let mutable newSnake = snake
-        match dir with
-        | 0 -> newSnake <- ListTools.ReplaceFront (sfx + 1, sfy) newSnake
-        | 1 -> newSnake <- ListTools.ReplaceFront (sfx, sfy + 1) newSnake
-        | 2 -> newSnake <- ListTools.ReplaceFront (sfx - 1, sfy) newSnake
-        | _ -> newSnake <- ListTools.ReplaceFront (sfx, sfy - 1) newSnake
+        let newHead = 
+            match dir with
+            | 0 -> (sfx + 1, sfy)
+            | 1 -> (sfx, sfy + 1)
+            | 2 -> (sfx - 1, sfy)
+            | _ -> (sfx, sfy - 1)
 
-        (* Draw everything *)
-        Console.FruitAtLocation (1,1)
-        
-        Console.ClearOldSnake snake[snake.Length-1]
-        Console.DrawSnake newSnake
+        (* Check fruit collision *)
+        let fruitCol = (fruit = newHead)
+
+        (* Create new snake *)
+        let newSnake = 
+            if fruitCol then newHead::snake
+            else ListTools.ReplaceFront newHead snake
+
+        (* Get new fruit location *)
+        let newFruit = 
+            if fruitCol then NewFruit (newSnake, rand)
+            else fruit
 
         (* Check collision *)
         let selfCol = Collision.PlayerColSelf newSnake
         let borderCol = Collision.PlayerColBorder (13, 13) newSnake[0]
+
+        (* Draw everything *)
+        Console.FruitAtLocation fruit
+        
+        Console.ClearOldSnake snake[snake.Length-1]
+        Console.DrawSnake newSnake
 
         (* If player collides with something, then exit MainLoop *)
         if not (selfCol || borderCol) then 
@@ -136,13 +153,13 @@ module Game =
                 if Math.Abs(dir - sd) = 2 then sd <- -1
 
                 if sd = -1 then
-                    MainLoop(newSnake, dir)
+                    MainLoop(newSnake, dir, newFruit, rand)
                 else
-                    MainLoop(newSnake, sd)
+                    MainLoop(newSnake, sd, newFruit, rand)
 
 [<EntryPoint>]
 let main args =
     ConsoleInterface.ClearScreen
     Console.DrawBorder(13, 13)
-    Game.MainLoop ([(7,6); (6,6); (5,6)], 0)
+    Game.MainLoop ([(7,6); (6,6); (5,6)], 0, (6, 4), Random())
     0
