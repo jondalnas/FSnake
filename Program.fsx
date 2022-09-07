@@ -60,6 +60,29 @@ module Console =
         ConsoleInterface.MoveCursor snake
         ConsoleInterface.WriteScreen ' '
 
+module Collision =
+    let PlayerColBorder (w, h) = function
+        | (x,_) when x=w-1 || x=0 -> true
+        | (_,y) when y=h-1 || y=0 -> true
+        |_ -> false
+
+    let rec PlayerColPoint (p, snake: (int*int) list) = 
+        let head = snake[0]
+        let tail = snake.Tail
+
+        if p = head then true
+        elif not tail.IsEmpty then PlayerColPoint(p, tail)
+        else false
+
+    let rec PlayerColSelf (snake:(int*int) list) =
+        let snakeHead = snake[0]
+        let snakeTail = snake.Tail
+
+        if snakeTail.IsEmpty then false
+        elif PlayerColPoint (snakeHead, snakeTail) then true
+        else PlayerColSelf snakeTail
+
+
 module Input =
     (* Returns if the program should exit or not *)
     let ShouldExit (keyboardList) =
@@ -95,18 +118,27 @@ module Game =
         Console.ClearOldSnake snake[snake.Length-1]
         Console.DrawSnake newSnake
 
-        (* Sleep before next update *)
-        Threading.Thread.Sleep(250)
+        (* Check collision *)
+        let selfCol = Collision.PlayerColSelf newSnake
+        let borderCol = Collision.PlayerColBorder (13, 13) newSnake[0]
 
-        (* If exit button is not pressed, then call MainLoop *)
-        let exit = Input.ShouldExit(keyboardList)
-        if not exit then 
-            (* Update snake direction *)
-            let sd = Input.Direction(keyboardList)
-            if sd = -1 then
-                MainLoop(newSnake, dir)
-            else
-                MainLoop(newSnake, sd)
+        (* If player collides with something, then exit MainLoop *)
+        if not (selfCol || borderCol) then 
+            (* If exit button is not pressed, then call MainLoop *)
+            let exit = Input.ShouldExit(keyboardList)
+            if not exit then
+                (* Sleep before next update *)
+                Threading.Thread.Sleep(250)
+
+                (* Update snake direction *)
+                let mutable sd = Input.Direction(keyboardList)
+                (* If the new snake direction is two away from old snake direction, then player tries to move into themself *)
+                if Math.Abs(dir - sd) = 2 then sd <- -1
+
+                if sd = -1 then
+                    MainLoop(newSnake, dir)
+                else
+                    MainLoop(newSnake, sd)
 
 [<EntryPoint>]
 let main args =
