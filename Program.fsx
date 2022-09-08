@@ -9,6 +9,11 @@ module ListTools =
         | head::_ when head=elm -> true
         | _::tail -> Contains elm tail
         |_ -> false
+    
+    let rec Remove elm = function
+        | [] -> []
+        | x::tail when x = elm -> tail
+        | head::tail -> head::Remove elm tail
 
 module ConsoleInterface =
     (* Writes a character to the screen *)
@@ -25,13 +30,21 @@ module ConsoleInterface =
 
 module Keyboard =
     (* Read all keys pressed since last frame *)
-    let rec ReadKeyboard () =
-        if Console.KeyAvailable then Console.ReadKey(false).Key::ReadKeyboard()
-        else []
+    let rec ReadKeyboard lastKeyList =
+        if Console.KeyAvailable then 
+            let key = Console.ReadKey(false).Key
+            let keyList = ReadKeyboard lastKeyList
 
-    (* Checks if a certain key is down *)
-    let GetKeyDown (keyboardList, key:ConsoleKey) =
-        ListTools.Contains key keyboardList
+            if ListTools.Contains key keyList then
+                keyList
+            else
+                key::keyList
+        else lastKeyList
+
+    (* Checks if key is the next in the queue *)
+    let GetKeyDown (key:ConsoleKey) = function
+        | frontKey::rest when frontKey = key ->  (rest, true)
+        | list -> (list, false)
 
 module Console =
     (* Moves the cursor to the specified location and prints fruit character *)
@@ -86,15 +99,22 @@ module Collision =
 module Input =
     (* Returns if the program should exit or not *)
     let ShouldExit (keyboardList) =
-        Keyboard.GetKeyDown (keyboardList, ConsoleKey.Q)
+        ListTools.Contains ConsoleKey.Q keyboardList
 
     (* Returns which direction player should move *)
     let Direction (keyboardList) =
-        if Keyboard.GetKeyDown (keyboardList, ConsoleKey.RightArrow) then 0
-        elif Keyboard.GetKeyDown (keyboardList, ConsoleKey.DownArrow) then 1
-        elif Keyboard.GetKeyDown (keyboardList, ConsoleKey.LeftArrow) then 2
-        elif Keyboard.GetKeyDown (keyboardList, ConsoleKey.UpArrow) then 3
-        else -1
+        let (rightList, right) = Keyboard.GetKeyDown ConsoleKey.RightArrow keyboardList
+        if right then (0, rightList)
+        else
+            let (downList, down) = Keyboard.GetKeyDown ConsoleKey.DownArrow keyboardList
+            if down then (1, downList)
+            else
+                let (leftList, left) = Keyboard.GetKeyDown ConsoleKey.LeftArrow keyboardList
+                if left then (2, leftList)
+                else
+                    let (upList, up) = Keyboard.GetKeyDown ConsoleKey.UpArrow keyboardList
+                    if up then (3, upList)
+                    else (-1, keyboardList)
 
 module Game =
     let rec NewFruit (snake, rand: Random) =
@@ -102,9 +122,9 @@ module Game =
         if Collision.PlayerColPoint (fruit, snake) then NewFruit (snake, rand)
         else fruit
 
-    let rec MainLoop (snake: (int*int) list, dir, fruit, rand: Random) =
+    let rec MainLoop (snake: (int*int) list, dir, fruit, rand: Random, lastKeyboardList) =
         (* Read keyboard *)
-        let keyboardList = Keyboard.ReadKeyboard()
+        let keyboardList = Keyboard.ReadKeyboard lastKeyboardList
 
         (* Find new snake head *)
         let snakeFront = snake[0]
@@ -139,6 +159,16 @@ module Game =
         Console.ClearOldSnake snake[snake.Length-1]
         Console.DrawSnake newSnake
 
+        ConsoleInterface.MoveCursor(0, 0)
+        let rec printKeys = function
+            | [] -> ()
+            | head::tail ->
+                let str = head.ToString()
+                printf "%s " str
+                printKeys tail
+                ()
+        printKeys keyboardList
+
         (* If player collides with something, then exit MainLoop *)
         if not (selfCol || borderCol) then 
             (* If exit button is not pressed, then call MainLoop *)
@@ -148,18 +178,18 @@ module Game =
                 Threading.Thread.Sleep(250)
 
                 (* Update snake direction *)
-                let mutable sd = Input.Direction(keyboardList)
+                let mutable (sd, sdList) = Input.Direction(keyboardList)
                 (* If the new snake direction is two away from old snake direction, then player tries to move into themself *)
                 if Math.Abs(dir - sd) = 2 then sd <- -1
 
                 if sd = -1 then
-                    MainLoop(newSnake, dir, newFruit, rand)
+                    MainLoop(newSnake, dir, newFruit, rand, keyboardList)
                 else
-                    MainLoop(newSnake, sd, newFruit, rand)
+                    MainLoop(newSnake, sd, newFruit, rand, sdList)
 
 [<EntryPoint>]
 let main args =
     ConsoleInterface.ClearScreen
     Console.DrawBorder(13, 13)
-    Game.MainLoop ([(7,6); (6,6); (5,6)], 0, (6, 4), Random())
+    Game.MainLoop ([(7,6); (6,6); (5,6)], 0, (6, 4), Random(), [])
     0
