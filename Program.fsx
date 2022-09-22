@@ -160,14 +160,6 @@ module Game =
         Console.DrawSnake newSnake
 
         ConsoleInterface.MoveCursor(0, 0)
-        let rec printKeys = function
-            | [] -> ()
-            | head::tail ->
-                let str = head.ToString()
-                printf "%s " str
-                printKeys tail
-                ()
-        printKeys keyboardList
 
         (* If player collides with something, then exit MainLoop *)
         if not (selfCol || borderCol) then 
