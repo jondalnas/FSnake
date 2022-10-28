@@ -5,16 +5,6 @@ module ListTools =
         | [] -> []
         | front::tail -> elm::ReplaceFront front tail
 
-    let rec Contains elm = function
-        | head::_ when head=elm -> true
-        | _::tail -> Contains elm tail
-        |_ -> false
-    
-    let rec Remove elm = function
-        | [] -> []
-        | x::tail when x = elm -> tail
-        | head::tail -> head::Remove elm tail
-
 module ConsoleInterface =
     (* Writes a character to the screen *)
     let WriteScreen (x: char) =
@@ -35,7 +25,7 @@ module Keyboard =
             let key = Console.ReadKey(false).Key
             let keyList = ReadKeyboard lastKeyList
 
-            if ListTools.Contains key keyList then
+            if List.contains key keyList then
                 keyList
             else
                 key::keyList
@@ -57,16 +47,13 @@ module Console =
         let rec Border = function
             | (0, 0, _, _) -> ConsoleInterface.WriteScreen('#')
             | (0, y, w, h) -> ConsoleInterface.WriteScreen('#'); ConsoleInterface.WriteScreen('\n'); Border (w, y-1, w, h)
-            | (x, 0, w, h) -> ConsoleInterface.WriteScreen('#'); Border (x-1, 0, w, h)
-            | (x, y, w, h) when x = w -> ConsoleInterface.WriteScreen('#'); Border (x-1, y, w, h)
-            | (x, y, w, h) when y = h -> ConsoleInterface.WriteScreen('#'); Border (x-1, y, w, h)
+            | (x, y, w, h) when x = w || y = h || y = 0 -> ConsoleInterface.WriteScreen('#'); Border (x-1, y, w, h)
             | (x, y, w, h) -> ConsoleInterface.WriteScreen(' '); Border (x-1, y, w, h)
         Border(w-1, h-1, w-1, h-1)
 
     (* Draws a snake recursively *)
-    let rec DrawSnake = function
-        | [] -> ()
-        | first::tail -> ConsoleInterface.MoveCursor first; ConsoleInterface.WriteScreen '*'; DrawSnake tail
+    let rec DrawSnake snake =
+        List.iter (fun elm -> ConsoleInterface.MoveCursor elm; ConsoleInterface.WriteScreen '*') snake
 
     (* Clears the old snake recursively *)
     let ClearOldSnake snake =
@@ -74,32 +61,21 @@ module Console =
         ConsoleInterface.WriteScreen ' '
 
 module Collision =
-    let PlayerColBorder (w, h) = function
-        | (x,_) when x=w-1 || x=0 -> true
-        | (_,y) when y=h-1 || y=0 -> true
-        |_ -> false
+    let PlayerColBorder (w, h) (x, y) =
+        x = 0 || y = 0 || x = w-1 || y = h-1
 
-    let rec PlayerColPoint (p, snake: (int*int) list) = 
-        let head = snake[0]
-        let tail = snake.Tail
+    let rec PlayerColPoint p snake =
+        List.exists (fun elm -> elm = p) snake
 
-        if p = head then true
-        elif not tail.IsEmpty then PlayerColPoint(p, tail)
-        else false
-
-    let rec PlayerColSelf (snake:(int*int) list) =
-        let snakeHead = snake[0]
-        let snakeTail = snake.Tail
-
-        if snakeTail.IsEmpty then false
-        elif PlayerColPoint (snakeHead, snakeTail) then true
-        else PlayerColSelf snakeTail
+    let rec PlayerColSelf = function
+        | [] -> false
+        | head::tail -> PlayerColPoint head tail
 
 
 module Input =
     (* Returns if the program should exit or not *)
     let ShouldExit (keyboardList) =
-        ListTools.Contains ConsoleKey.Q keyboardList
+        List.contains ConsoleKey.Q keyboardList
 
     (* Returns which direction player should move *)
     let Direction (keyboardList) =
@@ -119,7 +95,7 @@ module Input =
 module Game =
     let rec NewFruit (snake, rand: Random) =
         let fruit = (rand.Next() % 11 + 1, rand.Next() % 11 + 1)
-        if Collision.PlayerColPoint (fruit, snake) then NewFruit (snake, rand)
+        if Collision.PlayerColPoint fruit snake then NewFruit (snake, rand)
         else fruit
 
     let rec MainLoop (snake: (int*int) list, dir, fruit, rand: Random, lastKeyboardList) =
